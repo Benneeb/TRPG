@@ -1,0 +1,1203 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>눈 감고 낚시</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="화면을 보지 않고 소리만 듣고 낚시하는 게임">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500&display=swap">
+<style>
+/* Layout: one full-bleed black stage (the pond at night). The start card sits low-left over a bobber ripple;
+   records and settings live in a bottom sheet. A single deliberate dark look: no light theme. */
+:root {
+  --night: #000;          /* play screen: true black (OLED) */
+  --pond: #050b0c;        /* start screen and sheet ground, a hair of water-green */
+  --mist: #cdd7d4;        /* primary text */
+  --dim: #74847f;         /* secondary text */
+  --line: #1a2526;        /* hairlines, meter track */
+  --reed: #7fa88f;        /* safe tension, accents */
+  --warn: #d9a441;        /* caution tension */
+  --bobber: #ff5a36;      /* the float's fluorescent tip: danger + the one bright mark */
+  --display: "Gowun Batang", "Nanum Myeongjo", "AppleMyungjo", serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--night);
+  color: var(--mist);
+  font-family: var(--body);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--bobber); outline-offset: 3px; }
+
+#stage { position: fixed; inset: 0; z-index: 1; touch-action: none; background: var(--night); }
+
+/* ---------- start screen ---------- */
+#intro { position: fixed; inset: 0; z-index: 5; background: var(--pond); display: flex; align-items: flex-end; overflow: auto; }
+#ripple { position: absolute; inset: 0; width: 100%; height: 100%; }
+.intro-copy {
+  position: relative;
+  width: 100%;
+  max-width: 36rem;
+  display: grid;
+  gap: 1.1rem;
+  padding-block: 2rem calc(2.5rem + env(safe-area-inset-bottom, 0px));
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.eyebrow { margin: 0; font-size: .75rem; letter-spacing: .14em; color: var(--reed); }
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: clamp(2.6rem, 10vw, 4.4rem);
+  line-height: 1.05;
+  letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.lede { margin: 0; line-height: 1.75; max-width: 30em; color: var(--mist); opacity: .86; }
+.controls { margin: 0; display: grid; gap: .55rem; border-top: 1px solid var(--line); padding-top: 1rem; }
+.controls div { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: 1rem; align-items: baseline; }
+.controls dt { color: var(--dim); font-size: .85rem; }
+.controls dd { margin: 0; }
+.controls .sound { font-family: var(--display); color: var(--bobber); }
+#startBtn {
+  justify-self: start;
+  font-weight: 500;
+  font-size: 1.05rem;
+  color: var(--night);
+  background: var(--mist);
+  border: 0;
+  border-radius: 999px;
+  padding: .85rem 1.9rem;
+}
+.fine { margin: 0; font-size: .8rem; line-height: 1.6; color: var(--dim); }
+
+/* ---------- in-game overlays ---------- */
+#menuBtn {
+  position: fixed;
+  z-index: 3;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: calc(12px + env(safe-area-inset-right, 0px));
+  font-size: .8rem;
+  color: var(--dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .45rem .95rem;
+  opacity: .6;
+}
+#caption {
+  position: fixed;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  text-align: center;
+  font-family: var(--display);
+  font-size: 1.15rem;
+  line-height: 1.6;
+  text-wrap: balance;
+  color: var(--mist);
+  opacity: 0;
+  transition: opacity .4s;
+  pointer-events: none;
+}
+#caption.show { opacity: .82; }
+#assist {
+  position: fixed;
+  z-index: 2;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: calc(16px + env(safe-area-inset-left, 0px));
+  width: min(220px, 55vw);
+  display: grid;
+  gap: 6px;
+  font-size: .75rem;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.meter { position: relative; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.meter i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--reed); }
+.meter.warn i { background: var(--warn); }
+.meter.danger i { background: var(--bobber); }
+.meter b { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--dim); }
+
+/* ---------- records & settings sheet ---------- */
+.sheet { position: fixed; inset: 0; z-index: 10; background: rgba(0, 0, 0, .8); display: flex; align-items: flex-end; justify-content: center; }
+.sheet-inner {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90%;
+  overflow: auto;
+  touch-action: pan-y;
+  background: var(--pond);
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  display: grid;
+  gap: 22px;
+  padding-block: 20px calc(28px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+  -webkit-user-select: text;
+  user-select: text;
+}
+.sheet header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sheet h2 { margin: 0; font-family: var(--display); font-size: 1.5rem; }
+.sheet h3 { margin: 0 0 .25rem; font-size: .75rem; letter-spacing: .14em; color: var(--reed); font-weight: 500; }
+.ghost { background: transparent; color: var(--mist); border: 1px solid var(--line); border-radius: 999px; padding: .5rem 1rem; }
+.totals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.totals div { display: grid; gap: 2px; }
+.totals dt { font-size: .72rem; color: var(--dim); }
+.totals dd { margin: 0; font-family: var(--display); font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.dex { list-style: none; margin: 0; padding: 0; display: grid; }
+.dex li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 14px; align-items: baseline; padding: .6rem 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.dex .name { font-family: var(--display); font-size: 1.05rem; }
+.dex .grade { font-size: .72rem; color: var(--dim); margin-left: .5rem; font-family: var(--body); }
+.dex .legend .grade { color: var(--warn); }
+.dex .num { color: var(--dim); font-size: .85rem; min-width: 3.5rem; text-align: right; }
+.dex .unknown .name { color: var(--dim); }
+.settings { display: grid; gap: 12px; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.row label { line-height: 1.4; }
+.row small { display: block; color: var(--dim); font-size: .75rem; }
+.row input[type="range"] { width: 9rem; accent-color: var(--reed); }
+.row input[type="checkbox"] { width: 1.25rem; height: 1.25rem; accent-color: var(--reed); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.danger-zone { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--dim); font-size: .85rem; }
+.danger-zone .ghost.red { border-color: var(--bobber); color: var(--bobber); }
+
+@media (prefers-reduced-motion: reduce) {
+  #caption { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="stage" aria-label="낚시터. 화면 아무 곳이나 터치하세요." role="application"></div>
+
+<section id="intro" aria-labelledby="gameTitle">
+  <canvas id="ripple" aria-hidden="true"></canvas>
+  <div class="intro-copy">
+    <p class="eyebrow">이어폰 권장 · 소리만으로 플레이</p>
+    <h1 id="gameTitle">눈 감고 낚시</h1>
+    <p class="lede">화면에는 아무것도 없습니다. 물소리와 입질 소리, 낚싯줄이 우는 소리만 듣고 손가락 하나로 낚시하세요.</p>
+    <dl class="controls">
+      <div><dt>짧게 터치</dt><dd>낚싯줄 던지기 · <span class="sound">촤박!</span> 소리에 챔질</dd></div>
+      <div><dt>길게 누르기</dt><dd>릴 감기 (드르륵)</dd></div>
+      <div><dt>손 떼기</dt><dd><span class="sound">끼이익</span> 소리가 높아지면 바로</dd></div>
+    </dl>
+    <button id="startBtn" type="button">시작하기</button>
+    <p class="fine">아이폰은 무음 모드를 해제해야 소리가 납니다. 컴퓨터에서는 스페이스바로 플레이할 수 있습니다.</p>
+  </div>
+</section>
+
+<button id="menuBtn" type="button" hidden>기록 · 설정</button>
+<p id="caption" aria-live="polite"></p>
+
+<div id="assist" hidden>
+  <div id="assistState">대기</div>
+  <div>장력</div>
+  <div class="meter" id="tensionMeter"><i></i><b style="left:60%"></b><b style="left:85%"></b></div>
+  <div>남은 거리</div>
+  <div class="meter" id="distanceMeter"><i></i></div>
+</div>
+
+<div id="menu" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+  <div class="sheet-inner">
+    <header>
+      <h2 id="menuTitle">낚시 기록</h2>
+      <button id="closeMenu" class="ghost" type="button">닫고 계속하기</button>
+    </header>
+
+    <dl class="totals">
+      <div><dt>던진 횟수</dt><dd id="tCasts">0</dd></div>
+      <div><dt>잡은 물고기</dt><dd id="tCatches">0</dd></div>
+      <div><dt>성공률</dt><dd id="tRate">–</dd></div>
+      <div><dt>퍼펙트 챔질</dt><dd id="tPerfect">0</dd></div>
+    </dl>
+
+    <section>
+      <h3>도감</h3>
+      <ol class="dex" id="dex"></ol>
+    </section>
+
+    <div class="actions">
+      <button id="speakRecords" class="ghost" type="button">기록 듣기</button>
+      <button id="replayTut" class="ghost" type="button">튜토리얼 다시 하기</button>
+    </div>
+
+    <section class="settings">
+      <h3>설정</h3>
+      <div class="row"><label for="bgmVolume">물소리 · 자연음</label><input id="bgmVolume" type="range" min="0" max="1" step="0.05"></div>
+      <div class="row"><label for="sfxVolume">효과음</label><input id="sfxVolume" type="range" min="0" max="1" step="0.05"></div>
+      <div class="row"><label for="voiceVolume">음성 안내</label><input id="voiceVolume" type="range" min="0" max="1" step="0.05"></div>
+      <div class="row"><label for="failHint">실패 음성 힌트<small>왜 놓쳤는지 말로 알려줍니다</small></label><input id="failHint" type="checkbox"></div>
+      <div class="row"><label for="haptics">진동<small>안드로이드에서 동작합니다</small></label><input id="haptics" type="checkbox"></div>
+      <div class="row"><label for="doubleTapCast">두 번 탭해서 던지기<small>주머니 속 오작동 방지</small></label><input id="doubleTapCast" type="checkbox"></div>
+      <div class="row"><label for="captions">음성 자막</label><input id="captions" type="checkbox"></div>
+      <div class="row"><label for="assistToggle">연습용 장력 표시<small>화면에 장력과 거리를 보여줍니다</small></label><input id="assistToggle" type="checkbox"></div>
+    </section>
+
+    <div class="danger-zone" id="resetZone">
+      <button id="resetData" class="ghost" type="button">기록 초기화</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = (s) => document.querySelector(s);
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const panRand = (w = 0.8) => rand(-w, w);
+const KOR_COUNT = ["영", "한", "두", "세", "네", "다섯"];
+
+/* =========================================================
+   저장 데이터
+   ========================================================= */
+const STORE_KEY = "eyes-closed-fishing-v1";
+const DEFAULT_DATA = () => ({
+  version: 1,
+  settings: { bgmVolume: 0.7, sfxVolume: 1, voiceVolume: 1, failHint: true, haptics: true, doubleTapCast: false, captions: true, assist: false },
+  stats: { totalCasts: 0, totalCatches: 0, perfectHooks: 0 },
+  fish: {},
+  tutorialDone: false,
+});
+function loadData() {
+  const base = DEFAULT_DATA();
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      return {
+        ...base, ...d,
+        settings: { ...base.settings, ...(d.settings || {}) },
+        stats: { ...base.stats, ...(d.stats || {}) },
+        fish: { ...(d.fish || {}) },
+      };
+    }
+  } catch (e) { /* storage unavailable */ }
+  return base;
+}
+function saveData() { try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) { /* ignore */ } }
+let data = loadData();
+
+/* =========================================================
+   어종 (기획서 5.2 초기 튜닝값)
+   rise/fall: 장력 변화(초당), reel: 누를 때 거리 감소, resist: 뗐을 때 거리 증가
+   ========================================================= */
+const FISH = [
+  { id: "crucian", name: "붕어", grade: "흔함", weight: 45, size: [10, 35],
+    wait: [6, 12], pre: [2, 4], silence: [0.8, 1.5], window: 1.4,
+    rise: 15, fall: 45, reel: 10, resist: 2, runGap: null, runDur: [0, 0], runPush: 0, runPull: 0,
+    bite: { freq: 1500, vol: 0.8, dur: 0.36 } },
+  { id: "carp", name: "잉어", grade: "보통", weight: 25, size: [30, 80],
+    wait: [5, 10], pre: [1, 3], silence: [0.6, 1.2], window: 1.2,
+    rise: 22, fall: 38, reel: 12, resist: 4, runGap: [4, 7], runDur: [1, 1.8], runPush: 18, runPull: 4,
+    bite: { freq: 1150, vol: 1, dur: 0.46 } },
+  { id: "bass", name: "배스", grade: "보통", weight: 22, size: [20, 60],
+    wait: [4, 8], pre: [0, 1], silence: null, window: 0.9,
+    rise: 30, fall: 42, reel: 15, resist: 4, runGap: [2, 4], runDur: [0.6, 1.2], runPush: 26, runPull: 6,
+    bite: { freq: 1900, vol: 1, dur: 0.28 } },
+  { id: "catfish", name: "메기", grade: "희귀", weight: 7.5, size: [40, 110],
+    wait: [7, 12], pre: [2, 3], silence: [1.5, 2.5], window: 1.2,
+    rise: 18, fall: 22, reel: 9, resist: 3, runGap: [7, 11], runDur: [2, 3], runPush: 12, runPull: 5,
+    bite: { freq: 620, vol: 1, dur: 0.55 } },
+  { id: "goldCarp", name: "황금 잉어", grade: "전설", weight: 0.5, size: [50, 90],
+    wait: [5, 10], pre: [3, 3], silence: [0.8, 1.2], window: 1.0,
+    rise: 26, fall: 32, reel: 13, resist: 5, runGap: [2.5, 4.5], runDur: [0.8, 1.5], runPush: 22, runPull: 6,
+    gold: true, bite: { freq: 1300, vol: 1, dur: 0.45 } },
+];
+
+/* =========================================================
+   오디오 엔진: 모든 소리를 Web Audio로 실시간 합성
+   ========================================================= */
+let ctx = null, master, ambBus, sfxBus, duck, noiseBuf, brownBuf;
+let reelHum, strainGain, strainO1, strainO2, vibDepth, slackGain;
+let reelNextClick = 0;
+let strainPreview = null; // {t0, dur}
+
+function initAudio() {
+  if (ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ctx = new AC();
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -12; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
+  master = ctx.createGain(); master.gain.value = 0.9;
+  master.connect(comp); comp.connect(ctx.destination);
+  duck = ctx.createGain(); duck.connect(master);
+  ambBus = ctx.createGain(); ambBus.gain.value = 0; ambBus.connect(duck);
+  sfxBus = ctx.createGain(); sfxBus.connect(master);
+
+  const sr = ctx.sampleRate;
+  noiseBuf = ctx.createBuffer(1, sr * 2, sr);
+  const n = noiseBuf.getChannelData(0);
+  for (let i = 0; i < n.length; i++) n[i] = Math.random() * 2 - 1;
+  brownBuf = ctx.createBuffer(1, sr * 4, sr);
+  const b = brownBuf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < b.length; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; b[i] = last * 3.5; }
+
+  setupContinuous();
+  startAmbient();
+  applyVolumes();
+}
+const now = () => ctx.currentTime;
+function applyVolumes() {
+  if (!ctx) return;
+  ambBus.gain.setTargetAtTime(data.settings.bgmVolume * 0.9, now(), 0.4);
+  sfxBus.gain.setTargetAtTime(data.settings.sfxVolume, now(), 0.05);
+}
+function dest(pan = 0, bus = sfxBus) {
+  if (!pan || !ctx.createStereoPanner) return bus;
+  const p = ctx.createStereoPanner();
+  p.pan.value = clamp(pan, -1, 1);
+  p.connect(bus);
+  return p;
+}
+function noiseSrc(buf = noiseBuf) { const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; return s; }
+function envGain(t, a, d, vol) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0002), t + a);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+  return g;
+}
+function tone({ type = "sine", f0, f1, t = now(), a = 0.005, d = 0.1, vol = 0.2, pan = 0, bus }) {
+  const o = ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + a + d);
+  const g = envGain(t, a, d, vol);
+  o.connect(g); g.connect(dest(pan, bus || sfxBus));
+  o.start(t); o.stop(t + a + d + 0.05);
+}
+function burst({ t = now(), a = 0.003, d = 0.05, vol = 0.2, type = "bandpass", f0 = 2000, f1, q = 1, pan = 0, bus, buf }) {
+  const s = noiseSrc(buf);
+  const fl = ctx.createBiquadFilter();
+  fl.type = type; fl.Q.value = q;
+  fl.frequency.setValueAtTime(f0, t);
+  if (f1) fl.frequency.exponentialRampToValueAtTime(f1, t + a + d);
+  const g = envGain(t, a, d, vol);
+  s.connect(fl); fl.connect(g); g.connect(dest(pan, bus || sfxBus));
+  s.start(t, Math.random() * 1.5); s.stop(t + a + d + 0.05);
+}
+function duckAmbient(depth = 0.3, hold = 0.7) {
+  const t = now();
+  duck.gain.cancelScheduledValues(t);
+  duck.gain.setTargetAtTime(depth, t, 0.02);
+  duck.gain.setTargetAtTime(1, t + hold, 0.35);
+}
+
+function startAmbient() {
+  // 잔잔한 물소리: 갈색 소음 + 느린 출렁임
+  const body = noiseSrc(brownBuf);
+  const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 480;
+  const g = ctx.createGain(); g.gain.value = 0.5;
+  const lfo = ctx.createOscillator(); lfo.frequency.value = 0.11;
+  const lfoG = ctx.createGain(); lfoG.gain.value = 0.18;
+  lfo.connect(lfoG); lfoG.connect(g.gain);
+  body.connect(lp); lp.connect(g); g.connect(ambBus);
+  body.start(); lfo.start();
+  // 물가에 찰랑이는 높은 결
+  const shim = noiseSrc();
+  const bp = ctx.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1300; bp.Q.value = 0.6;
+  const g2 = ctx.createGain(); g2.gain.value = 0.022;
+  const lfo2 = ctx.createOscillator(); lfo2.frequency.value = 0.23;
+  const lfoG2 = ctx.createGain(); lfoG2.gain.value = 0.014;
+  lfo2.connect(lfoG2); lfoG2.connect(g2.gain);
+  shim.connect(bp); bp.connect(g2); g2.connect(ambBus);
+  shim.start(); lfo2.start();
+  scheduleBird();
+}
+function scheduleBird() {
+  setTimeout(() => {
+    if (ctx && ctx.state === "running" && !menuOpen) SFX.bird();
+    scheduleBird();
+  }, rand(7000, 16000));
+}
+
+function setupContinuous() {
+  // 릴 감기의 묵직한 바닥음
+  const hum = ctx.createOscillator(); hum.type = "sawtooth"; hum.frequency.value = 52;
+  const humLp = ctx.createBiquadFilter(); humLp.type = "lowpass"; humLp.frequency.value = 220;
+  reelHum = ctx.createGain(); reelHum.gain.value = 0;
+  hum.connect(humLp); humLp.connect(reelHum); reelHum.connect(sfxBus); hum.start();
+
+  // 낚싯줄 마찰음: 장력에 따라 음높이가 연속 상승
+  strainO1 = ctx.createOscillator(); strainO1.type = "sawtooth"; strainO1.frequency.value = 300;
+  strainO2 = ctx.createOscillator(); strainO2.type = "square"; strainO2.frequency.value = 302;
+  const o2g = ctx.createGain(); o2g.gain.value = 0.35;
+  const sbp = ctx.createBiquadFilter(); sbp.type = "bandpass"; sbp.Q.value = 5; sbp.frequency.value = 1200;
+  const vib = ctx.createOscillator(); vib.frequency.value = 7.5;
+  vibDepth = ctx.createGain(); vibDepth.gain.value = 4;
+  vib.connect(vibDepth); vibDepth.connect(strainO1.frequency); vibDepth.connect(strainO2.frequency);
+  strainGain = ctx.createGain(); strainGain.gain.value = 0;
+  strainO1.connect(sbp); strainO2.connect(o2g); o2g.connect(sbp);
+  sbp.connect(strainGain); strainGain.connect(sfxBus);
+  strainO1.start(); strainO2.start(); vib.start();
+  strainO1.__bp = sbp;
+
+  // 줄이 느슨할 때의 낮은 흔들림
+  const sl = ctx.createOscillator(); sl.frequency.value = 82;
+  const am = ctx.createGain(); am.gain.value = 0.5;
+  const amLfo = ctx.createOscillator(); amLfo.frequency.value = 2.6;
+  const amDepth = ctx.createGain(); amDepth.gain.value = 0.5;
+  amLfo.connect(amDepth); amDepth.connect(am.gain);
+  slackGain = ctx.createGain(); slackGain.gain.value = 0;
+  sl.connect(am); am.connect(slackGain); slackGain.connect(sfxBus);
+  sl.start(); amLfo.start();
+}
+
+const SFX = {
+  bird() {
+    const pan = panRand(0.9), t0 = now(), n = randInt(2, 4);
+    for (let i = 0; i < n; i++) {
+      const t = t0 + i * rand(0.12, 0.2);
+      const o = ctx.createOscillator();
+      const base = rand(2600, 3400);
+      o.frequency.setValueAtTime(base, t);
+      o.frequency.linearRampToValueAtTime(base * 1.35, t + 0.04);
+      o.frequency.linearRampToValueAtTime(base * 0.9, t + 0.09);
+      const g = envGain(t, 0.01, 0.08, rand(0.015, 0.03));
+      o.connect(g); g.connect(dest(pan, ambBus));
+      o.start(t); o.stop(t + 0.15);
+    }
+  },
+  splash({ t = now(), vol = 0.6, dur = 0.4, freq = 1200, pan = 0 } = {}) {
+    burst({ t, a: 0.004, d: dur, vol, type: "bandpass", f0: freq * 1.6, f1: freq * 0.45, q: 0.8, pan });
+    burst({ t: t + 0.01, a: 0.01, d: dur * 1.4, vol: vol * 0.5, type: "lowpass", f0: freq * 0.8, f1: 220, q: 0.5, pan });
+    tone({ t, f0: 150, f1: 48, a: 0.004, d: dur * 0.7, vol: vol * 0.45, pan });
+    for (let i = 0; i < 4; i++) {
+      tone({ t: t + dur * 0.6 + Math.random() * dur, f0: rand(900, 1500), f1: rand(1800, 2500), a: 0.002, d: 0.035, vol: vol * 0.07, pan: pan + rand(-0.3, 0.3) });
+    }
+  },
+  cast() {
+    const t = now();
+    burst({ t, a: 0.12, d: 0.3, vol: 0.32, type: "bandpass", f0: 380, f1: 2600, q: 1.2, pan: -0.25 });
+    for (let i = 0; i < 28; i++) {
+      const tt = t + 0.25 + i * (0.012 + i * 0.0009);
+      burst({ t: tt, a: 0.001, d: 0.008, vol: 0.11 * (1 - i / 28) + 0.005, type: "bandpass", f0: 3400, q: 6, pan: 0.1 });
+    }
+    tone({ t: t + 1.05, f0: 720, f1: 160, a: 0.003, d: 0.12, vol: 0.34, pan: 0.15 });
+    burst({ t: t + 1.05, a: 0.004, d: 0.18, vol: 0.2, type: "lowpass", f0: 1500, f1: 300, q: 0.7, pan: 0.15 });
+    return 1.45;
+  },
+  bubble(pan, t = now()) {
+    const f0 = rand(240, 380);
+    tone({ t, f0, f1: f0 * 4, a: 0.004, d: 0.07, vol: 0.15, pan });
+  },
+  approach(pan) {
+    let t = now();
+    const n = randInt(2, 4);
+    for (let i = 0; i < n; i++) { SFX.bubble(pan + rand(-0.1, 0.1), t); t += rand(0.09, 0.17); }
+  },
+  nibble(pan, t = now(), vol = 0.2) {
+    tone({ t, f0: 1200, f1: 640, a: 0.002, d: 0.03, vol, pan });
+    burst({ t, a: 0.001, d: 0.012, vol: vol * 0.4, type: "bandpass", f0: 2200, q: 2, pan });
+  },
+  nibblePattern(pan) {
+    const t = now();
+    SFX.nibble(pan, t);
+    SFX.nibble(pan, t + rand(0.4, 0.6), 0.16);
+  },
+  frog(pan) {
+    const t0 = now();
+    for (let g = 0; g < 2; g++) {
+      for (let i = 0; i < 6; i++) {
+        tone({ type: "sawtooth", t: t0 + g * 0.24 + i * 0.024, f0: 230 - g * 30, f1: 190 - g * 30, a: 0.003, d: 0.018, vol: 0.06, pan });
+      }
+    }
+  },
+  leaf(pan) {
+    const t = now();
+    burst({ t, a: 0.001, d: 0.015, vol: 0.06, type: "highpass", f0: 3500, q: 0.7, pan });
+    tone({ t: t + 0.005, f0: 900, f1: 700, a: 0.002, d: 0.02, vol: 0.045, pan });
+  },
+  chime(t = now(), vol = 1) {
+    [[1568, 0.06], [2349.3, 0.04], [3136, 0.025]].forEach(([f, v]) => tone({ t, f0: f, a: 0.002, d: 1.3, vol: v * vol }));
+  },
+  goldTick(pan) {
+    const t = now();
+    tone({ t, f0: 2093, a: 0.002, d: 0.3, vol: 0.06, pan });
+    SFX.nibble(pan, t, 0.12);
+  },
+  bite(fish, pan) {
+    const b = fish.bite;
+    SFX.splash({ vol: b.vol, dur: b.dur, freq: b.freq, pan: pan * 0.6 });
+    tone({ f0: 140, f1: 45, a: 0.003, d: 0.3, vol: 0.55, pan: pan * 0.6 });
+    if (fish.gold) SFX.chime(now() + 0.05, 1.3);
+    duckAmbient(0.3, 0.8);
+  },
+  hookSet(perfect) {
+    const t = now();
+    burst({ t, a: 0.01, d: 0.12, vol: 0.25, type: "bandpass", f0: 700, f1: 2400, q: 1.5 });
+    if (perfect) tone({ t: t + 0.05, f0: 1760, a: 0.003, d: 0.2, vol: 0.06 });
+  },
+  reelClick(t, load) {
+    burst({ t, a: 0.001, d: 0.006, vol: 0.2, type: "bandpass", f0: 2600 - load * 900 + rand(-150, 150), q: 5 });
+  },
+  run(pan) { SFX.splash({ vol: 0.5, dur: 0.35, freq: 1000, pan }); },
+  thrash(vol, pan) { SFX.splash({ vol, dur: 0.24, freq: 1350, pan }); },
+  snap(pan) {
+    const t = now();
+    burst({ t, a: 0.001, d: 0.03, vol: 0.6, type: "highpass", f0: 2500, q: 0.7 });
+    tone({ type: "triangle", t, f0: 1900, f1: 1450, a: 0.002, d: 0.6, vol: 0.25 });
+    tone({ t, f0: 3800, f1: 3000, a: 0.002, d: 0.4, vol: 0.08 });
+    SFX.splash({ t: t + 0.35, vol: 0.14, dur: 0.3, freq: 1100, pan });
+  },
+  hookFree(pan) {
+    const t = now();
+    tone({ t, f0: 320, f1: 110, a: 0.003, d: 0.1, vol: 0.3 });
+    SFX.splash({ t: t + 0.15, vol: 0.18, dur: 0.25, freq: 1200, pan });
+  },
+  fleeEarly(pan) {
+    const t = now();
+    SFX.splash({ t, vol: 0.45, dur: 0.25, freq: 1300, pan });
+    SFX.splash({ t: t + 0.22, vol: 0.22, dur: 0.2, freq: 1300, pan: pan + 0.4 });
+    SFX.splash({ t: t + 0.46, vol: 0.1, dur: 0.2, freq: 1300, pan: pan + 0.8 });
+  },
+  missLate(pan) {
+    const t = now();
+    [600, 480, 380].forEach((f, i) => tone({ t: t + i * 0.25, f0: f, f1: f * 0.5, a: 0.004, d: 0.12, vol: 0.09, pan }));
+    burst({ t, a: 0.2, d: 0.6, vol: 0.05, type: "lowpass", f0: 900, f1: 300, q: 0.5, pan });
+  },
+  jingle(t = now()) {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone({ type: "triangle", t: t + i * 0.09, f0: f, a: 0.004, d: 0.45, vol: 0.13 }));
+  },
+  record(t = now()) {
+    [1318.5, 1568, 2093, 2637].forEach((f, i) => tone({ t: t + i * 0.07, f0: f, a: 0.003, d: 0.5, vol: 0.06 }));
+  },
+  catch() {
+    const t = now();
+    SFX.splash({ t, vol: 0.9, dur: 0.8, freq: 1100 });
+    duckAmbient(0.35, 1.2);
+    SFX.jingle(t + 0.55);
+  },
+  ready() {
+    const t = now();
+    tone({ type: "triangle", t, f0: 420, f1: 390, a: 0.004, d: 0.07, vol: 0.08 });
+  },
+};
+
+function updateContinuous() {
+  if (!ctx) return;
+  const t = now();
+  const on = state === "REELING" && round && !round.frozen && !menuOpen;
+  const pressed = on && round.pressed;
+  reelHum.gain.setTargetAtTime(pressed ? 0.05 : 0, t, 0.03);
+  if (pressed) {
+    if (reelNextClick < t) reelNextClick = t;
+    const load = round.tension / 100;
+    while (reelNextClick < t + 0.06) {
+      SFX.reelClick(reelNextClick, load);
+      reelNextClick += 1 / (26 - load * 10);
+    }
+  } else {
+    reelNextClick = 0;
+  }
+  let ten = on ? round.tension : 0;
+  if (strainPreview) {
+    const p = (t - strainPreview.t0) / strainPreview.dur;
+    if (p >= 0 && p <= 1) ten = 50 + 48 * p;
+    else if (p > 1) strainPreview = null;
+  }
+  const x = clamp((ten - 50) / 50, 0, 1.2);
+  const g = ten < 50 ? 0 : Math.pow(x, 1.4) * 0.24;
+  const fq = 300 * Math.pow(2, x * 2.3);
+  strainGain.gain.setTargetAtTime(g, t, 0.03);
+  strainO1.frequency.setTargetAtTime(fq, t, 0.03);
+  strainO2.frequency.setTargetAtTime(fq * 1.006, t, 0.03);
+  strainO1.__bp.frequency.setTargetAtTime(fq * 2.2, t, 0.03);
+  vibDepth.gain.setTargetAtTime(fq * 0.012, t, 0.05);
+  slackGain.gain.setTargetAtTime(on && round.tension < 15 ? 0.07 : 0, t, 0.08);
+}
+
+/* =========================================================
+   음성 안내 · 자막 · 진동
+   ========================================================= */
+let koVoice = null, speechToken = 0, captionTimer = 0;
+const hasSpeech = "speechSynthesis" in window;
+function pickVoice() {
+  try {
+    const vs = speechSynthesis.getVoices();
+    koVoice = vs.find((v) => /^ko/i.test(v.lang)) || null;
+  } catch (e) { koVoice = null; }
+}
+if (hasSpeech) { pickVoice(); try { speechSynthesis.addEventListener("voiceschanged", pickVoice); } catch (e) { /* old */ } }
+
+function showCaption(text) {
+  clearTimeout(captionTimer);
+  const el = $("#caption");
+  el.textContent = text;
+  el.classList.toggle("show", data.settings.captions);
+}
+function hideCaption(delay = 0) {
+  clearTimeout(captionTimer);
+  captionTimer = setTimeout(() => $("#caption").classList.remove("show"), delay);
+}
+function say(text, onend) {
+  const my = ++speechToken;
+  showCaption(text);
+  let done = false;
+  const est = Math.max(1600, text.length * 160 + 700);
+  const fin = () => {
+    if (done) return;
+    done = true;
+    clearTimeout(safety);
+    if (my !== speechToken) return;
+    hideCaption(600);
+    if (onend) onend();
+  };
+  let safety = setTimeout(fin, est + 4000);
+  const fallback = () => { clearTimeout(safety); safety = setTimeout(fin, est); };
+  if (!hasSpeech || data.settings.voiceVolume <= 0) { fallback(); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ko-KR";
+    if (koVoice) u.voice = koVoice;
+    u.rate = 1.05;
+    u.volume = data.settings.voiceVolume;
+    u.onend = fin;
+    u.onerror = () => { if (my === speechToken) fallback(); };
+    speechSynthesis.speak(u);
+  } catch (e) { fallback(); }
+}
+function hush() {
+  speechToken++;
+  try { if (hasSpeech) speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+  hideCaption();
+}
+let lastBuzz = 0;
+function buzz(p) {
+  if (!data.settings.haptics) return;
+  try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) { /* ignore */ }
+}
+
+/* =========================================================
+   게임 상태 머신
+   ========================================================= */
+let state = "BOOT";
+let round = null;
+let timers = [];
+let menuOpen = false;
+let started = false;
+let lastTap = 0;
+let lastCatch = null;
+
+function later(ms, fn) {
+  const id = setTimeout(() => { timers = timers.filter((x) => x !== id); fn(); }, ms);
+  timers.push(id);
+  return id;
+}
+function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+function setState(s) { state = s; }
+
+function pickFish() {
+  if (tut.active) return FISH[0];
+  const total = FISH.reduce((a, f) => a + f.weight, 0);
+  let r = Math.random() * total;
+  for (const f of FISH) { r -= f.weight; if (r < 0) return f; }
+  return FISH[0];
+}
+function rollSize(f, perfect) {
+  const [lo, hi] = f.size, span = hi - lo;
+  const mean = lo + span * (perfect ? 0.5 : 0.4);
+  let u = 0, v = 0;
+  while (!u) u = Math.random();
+  while (!v) v = Math.random();
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return Math.round(clamp(mean + z * span / 5, lo, hi));
+}
+
+function cast() {
+  hush(); clearTimers();
+  round = { fish: pickFish(), pan: panRand(0.5), tension: 30, distance: 100, slack: 0, runLeft: 0, nextRun: Infinity, thrashIn: 1.5, pressed: false, frozen: false };
+  data.stats.totalCasts++; saveData();
+  setState("CASTING");
+  const d = SFX.cast();
+  later(d * 1000, () => {
+    if (tut.active && !tut.hinted) {
+      tut.hinted = true;
+      say("작은 소리는 아직이에요. 크게 물이 튀는 소리가 나면 바로 터치하세요.", () => startWaiting(4));
+    } else {
+      startWaiting(tut.active ? 4 : undefined);
+    }
+  });
+}
+
+function startWaiting(forcedWait) {
+  if (state !== "CASTING") return;
+  setState("WAITING");
+  const f = round.fish;
+  const wait = forcedWait ?? rand(f.wait[0], f.wait[1]);
+  const sil = f.silence ? rand(f.silence[0], f.silence[1]) : 0;
+  const winEnd = Math.max(1.2, wait - sil - 0.35);
+  const ev = [];
+  if (f.gold) {
+    // 황금 잉어: 일정한 3박 리듬 + 맑은 물방울
+    const st = Math.max(0.9, winEnd - 1.0);
+    ev.push([rand(0.6, Math.max(0.7, st - 0.8)), () => SFX.approach(round.pan)]);
+    [0, 0.42, 0.84].forEach((dt) => ev.push([st + dt, () => SFX.goldTick(round.pan)]));
+  } else {
+    const nPre = tut.active ? 2 : randInt(f.pre[0], f.pre[1]);
+    const times = [];
+    for (let i = 0; i < nPre; i++) times.push(rand(0.8, winEnd));
+    times.sort((a, b) => a - b);
+    times.forEach((tt, i) => ev.push([tt, i === 0 ? () => SFX.approach(round.pan) : () => SFX.nibblePattern(round.pan)]));
+  }
+  if (!tut.active && Math.random() < 0.55) {
+    const nd = randInt(1, 2);
+    for (let i = 0; i < nd; i++) {
+      const p = panRand(0.95);
+      ev.push([rand(0.8, Math.max(0.9, wait - 0.7)), Math.random() < 0.5 ? () => SFX.frog(p) : () => SFX.leaf(p)]);
+    }
+  }
+  ev.forEach(([tt, fn]) => later(tt * 1000, () => { if (state === "WAITING") fn(); }));
+  later(wait * 1000, bite);
+}
+
+function bite() {
+  if (state !== "WAITING") return;
+  setState("BITE");
+  round.biteAt = performance.now();
+  SFX.bite(round.fish, round.pan);
+  buzz(40);
+  const w = tut.active ? 2.0 : round.fish.window;
+  later(w * 1000, () => { if (state === "BITE") fail("late"); });
+}
+
+function hook() {
+  clearTimers();
+  const f = round.fish;
+  const dt = (performance.now() - round.biteAt) / 1000;
+  const perfect = dt <= 0.4;
+  round.perfect = perfect;
+  round.size = rollSize(f, perfect);
+  if (perfect) { data.stats.perfectHooks++; saveData(); }
+  buzz([25, 40, 25]);
+  SFX.hookSet(perfect);
+  round.distance = perfect ? 90 : 100;
+  round.tension = 30;
+  round.slack = 0;
+  round.nextRun = f.runGap ? rand(f.runGap[0], f.runGap[1]) : Infinity;
+  round.runLeft = 0;
+  round.thrashIn = rand(1, 2);
+  setState("REELING");
+  duck.gain.setTargetAtTime(0.6, now(), 0.3);
+  if (tut.active) { round.frozen = true; tut.onHook(); }
+}
+
+function stepReel(dt, tNow) {
+  const r = round, f = r.fish;
+  r.pressed = isPressed();
+  if (r.frozen) return;
+  const tm = tut.active ? 0.5 : 1;
+  if (r.runLeft > 0) {
+    r.runLeft -= dt;
+  } else if (f.runGap) {
+    r.nextRun -= dt;
+    if (r.nextRun <= 0) {
+      r.runLeft = rand(f.runDur[0], f.runDur[1]);
+      r.nextRun = rand(f.runGap[0], f.runGap[1]) + r.runLeft;
+      r.pan = clamp(r.pan + rand(-0.6, 0.6), -0.9, 0.9);
+      SFX.run(r.pan);
+      buzz(60);
+    }
+  }
+  const inRun = r.runLeft > 0;
+  if (r.pressed) { r.tension += f.rise * tm * dt; r.distance -= f.reel * dt; }
+  else { r.tension -= f.fall * dt; r.distance += f.resist * dt; }
+  if (inRun) { r.tension += f.runPush * tm * dt; r.distance += f.runPull * dt; }
+  r.tension = clamp(r.tension, 0, 110);
+  r.distance = Math.min(100, r.distance);
+
+  r.thrashIn -= dt;
+  if (r.thrashIn <= 0) {
+    r.thrashIn = rand(1.1, 2.4);
+    r.pan = clamp(r.pan + rand(-0.25, 0.25), -0.8, 0.8);
+    if (!inRun) SFX.thrash(0.05 + 0.33 * (1 - r.distance / 100), r.pan);
+  }
+  if (r.tension >= 85) { if (tNow - lastBuzz > 180) { buzz(120); lastBuzz = tNow; } }
+  else if (r.tension >= 60) { if (tNow - lastBuzz > 450) { buzz(18); lastBuzz = tNow; } }
+
+  if (r.tension >= 100) return fail("snap");
+  if (r.tension <= 10) { r.slack += dt; if (r.slack >= 3) return fail("escape"); } else r.slack = 0;
+  if (r.distance <= 0) return caught();
+}
+
+function caught() {
+  const r = round, f = r.fish;
+  clearTimers();
+  setState("CAUGHT");
+  buzz(250);
+  SFX.catch();
+  duck.gain.setTargetAtTime(1, now() + 1.2, 0.4);
+  const rec = data.fish[f.id] || { count: 0, maxSize: 0 };
+  const isNew = rec.count === 0;
+  const isRecord = !isNew && r.size > rec.maxSize;
+  rec.count++;
+  rec.maxSize = Math.max(rec.maxSize, r.size);
+  data.fish[f.id] = rec;
+  data.stats.totalCatches++;
+  saveData();
+  lastCatch = { id: f.id, name: f.name, size: r.size, isNew, isRecord };
+  let text = `${f.name}, ${r.size}센티미터.`;
+  if (tut.active) text += " 첫 물고기입니다.";
+  else if (isNew) text += " 새로운 물고기입니다.";
+  else if (isRecord) { text += " 신기록입니다."; later(900, () => SFX.record()); }
+  later(1300, () => say(text, () => { if (tut.active) tut.finish(); else toIdle(); }));
+}
+
+const FAIL_TEXT = { early: "너무 빨랐어요.", late: "놓쳤어요.", snap: "줄이 끊어졌어요.", escape: "물고기가 빠져나갔어요." };
+const TUT_FAIL_TEXT = {
+  early: "조금 빨랐어요. 크게 물이 튀는 소리를 기다리세요. 다시 던져 보세요.",
+  late: "조금 늦었어요. 크게 물이 튀면 바로 터치하세요. 다시 던져 보세요.",
+  snap: "줄이 끊어졌어요. 날카로운 소리가 나면 손을 떼세요. 다시 던져 보세요.",
+  escape: "줄이 너무 느슨했어요. 소리가 잦아들면 다시 누르세요. 다시 던져 보세요.",
+};
+function fail(kind) {
+  clearTimers();
+  setState("FAIL");
+  round.failKind = kind;
+  ({ early: SFX.fleeEarly, late: SFX.missLate, snap: SFX.snap, escape: SFX.hookFree })[kind](round.pan);
+  if (kind === "snap") buzz([200, 60, 200]);
+  duck.gain.setTargetAtTime(1, now() + 0.5, 0.4);
+  if (tut.active) { later(900, () => say(TUT_FAIL_TEXT[kind], toIdle)); return; }
+  if (data.settings.failHint) later(900, () => say(FAIL_TEXT[kind], toIdle));
+  else later(1500, toIdle);
+}
+function toIdle() {
+  clearTimers();
+  setState("IDLE");
+  if (ctx) duck.gain.setTargetAtTime(1, now(), 0.3);
+  SFX.ready();
+}
+function abortRound() {
+  hush(); clearTimers();
+  strainPreview = null;
+  if (state !== "BOOT") setState("IDLE");
+}
+
+/* =========================================================
+   튜토리얼 (기획서 8장)
+   ========================================================= */
+const tut = {
+  active: false,
+  hinted: false,
+  start() {
+    this.active = true;
+    this.hinted = false;
+    clearTimers();
+    setState("INTRO");
+    say("이어폰을 끼고 눈을 감아 보세요. 화면 아무 곳이나 한 번 터치하면 낚싯줄을 던집니다.", () => {
+      if (state === "INTRO") toIdle();
+    });
+  },
+  onHook() {
+    say("잘했어요. 손가락을 누르고 있으면 릴을 감습니다.", () => {
+      say("이런 날카로운 소리가 나면 바로 손을 떼세요.", () => {
+        strainPreview = { t0: now() + 0.1, dur: 2.4 };
+        later(2800, () => {
+          say("이제 눌러서 감아 보세요.", () => {
+            if (state === "REELING") { round.frozen = false; round.tension = 25; }
+          });
+        });
+      });
+    });
+  },
+  finish() {
+    this.active = false;
+    data.tutorialDone = true;
+    saveData();
+    say("이제 혼자서 낚시해 보세요. 터치하면 던집니다.", toIdle);
+  },
+};
+
+/* =========================================================
+   입력: 화면 전체가 하나의 버튼
+   ========================================================= */
+const pointers = new Set();
+let keyDown = false;
+let twoFingerTimer = 0;
+const isPressed = () => pointers.size > 0 || keyDown;
+
+function onPress() {
+  if (!started || menuOpen) return;
+  switch (state) {
+    case "IDLE":
+      if (data.settings.doubleTapCast && !tut.active) {
+        const n = performance.now();
+        if (n - lastTap < 400) { lastTap = 0; cast(); } else { lastTap = n; }
+      } else cast();
+      break;
+    case "WAITING": fail("early"); break;
+    case "BITE": hook(); break;
+    case "CAUGHT":
+    case "FAIL":
+      if (!tut.active) { hush(); toIdle(); }
+      break;
+    default: break;
+  }
+}
+const stage = $("#stage");
+stage.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  pointers.add(e.pointerId);
+  try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  if (pointers.size === 1) onPress();
+  if (pointers.size >= 2) {
+    clearTimeout(twoFingerTimer);
+    twoFingerTimer = setTimeout(() => { if (pointers.size >= 2) openMenu(); }, 1500);
+  }
+});
+["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => stage.addEventListener(ev, (e) => {
+  pointers.delete(e.pointerId);
+  if (pointers.size < 2) clearTimeout(twoFingerTimer);
+}));
+stage.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("keydown", (e) => {
+  if (!started) return;
+  if (e.key === "m" || e.key === "M") { e.preventDefault(); menuOpen ? closeMenu() : openMenu(); return; }
+  if (menuOpen) { if (e.key === "Escape") closeMenu(); return; }
+  if (e.code === "Space" || e.code === "Enter") {
+    e.preventDefault();
+    if (e.repeat || keyDown) return;
+    keyDown = true;
+    onPress();
+  }
+});
+window.addEventListener("keyup", (e) => { if (e.code === "Space" || e.code === "Enter") keyDown = false; });
+window.addEventListener("blur", () => { keyDown = false; pointers.clear(); });
+
+/* =========================================================
+   메인 루프
+   ========================================================= */
+let lastFrame = performance.now();
+function frame(t) {
+  const dt = Math.min(0.05, (t - lastFrame) / 1000);
+  lastFrame = t;
+  if (state === "REELING" && !menuOpen) stepReel(dt, t);
+  updateContinuous();
+  updateAssist();
+  requestAnimationFrame(frame);
+}
+
+/* =========================================================
+   화면: 시작, 연습용 표시, 기록·설정
+   ========================================================= */
+const STATE_LABEL = { BOOT: "", INTRO: "안내 중", IDLE: "던질 준비", CASTING: "던지는 중", WAITING: "입질 기다리는 중", BITE: "챔질!", REELING: "릴링", CAUGHT: "포획", FAIL: "실패" };
+function updateAssist() {
+  const box = $("#assist");
+  const show = started && data.settings.assist && !menuOpen;
+  box.hidden = !show;
+  if (!show) return;
+  $("#assistState").textContent = STATE_LABEL[state] || "";
+  const ten = state === "REELING" && round ? round.tension : 0;
+  const dist = (state === "REELING" || state === "CAUGHT") && round ? Math.max(0, round.distance) : 0;
+  const tm = $("#tensionMeter");
+  tm.querySelector("i").style.width = Math.min(100, ten) + "%";
+  tm.classList.toggle("warn", ten >= 60 && ten < 85);
+  tm.classList.toggle("danger", ten >= 85);
+  $("#distanceMeter i").style.width = dist + "%";
+}
+
+let wakeLock = null;
+async function requestWake() {
+  try { if (navigator.wakeLock && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.addEventListener("release", () => { wakeLock = null; }); } } catch (e) { wakeLock = null; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (!started) return;
+  if (document.hidden) {
+    abortRound();
+    try { ctx.suspend(); } catch (e) { /* ignore */ }
+  } else {
+    try { ctx.resume(); } catch (e) { /* ignore */ }
+    requestWake();
+    if (!menuOpen && state === "IDLE") SFX.ready();
+  }
+});
+
+$("#startBtn").addEventListener("click", () => {
+  initAudio();
+  if (ctx.state === "suspended") ctx.resume();
+  started = true;
+  stopRipple();
+  $("#intro").hidden = true;
+  $("#menuBtn").hidden = false;
+  requestWake();
+  stage.focus?.();
+  if (!data.tutorialDone) tut.start();
+  else { setState("IDLE"); say("터치해서 낚싯줄을 던지세요.", () => {}); SFX.ready(); }
+});
+
+function renderMenu() {
+  const st = data.stats;
+  $("#tCasts").textContent = st.totalCasts;
+  $("#tCatches").textContent = st.totalCatches;
+  $("#tRate").textContent = st.totalCasts ? Math.round(st.totalCatches / st.totalCasts * 100) + "%" : "–";
+  $("#tPerfect").textContent = st.perfectHooks;
+  const dex = $("#dex");
+  dex.textContent = "";
+  FISH.forEach((f) => {
+    const rec = data.fish[f.id];
+    const li = document.createElement("li");
+    const known = rec && rec.count > 0;
+    if (!known) li.classList.add("unknown");
+    if (f.gold) li.classList.add("legend");
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = known ? f.name : "???";
+    const grade = document.createElement("span");
+    grade.className = "grade";
+    grade.textContent = f.grade;
+    name.appendChild(grade);
+    const cnt = document.createElement("span");
+    cnt.className = "num";
+    cnt.textContent = known ? rec.count + "마리" : "–";
+    const max = document.createElement("span");
+    max.className = "num";
+    max.textContent = known ? "최대 " + rec.maxSize + "cm" : "";
+    li.append(name, cnt, max);
+    dex.appendChild(li);
+  });
+  const s = data.settings;
+  $("#bgmVolume").value = s.bgmVolume;
+  $("#sfxVolume").value = s.sfxVolume;
+  $("#voiceVolume").value = s.voiceVolume;
+  $("#failHint").checked = s.failHint;
+  $("#haptics").checked = s.haptics;
+  $("#doubleTapCast").checked = s.doubleTapCast;
+  $("#captions").checked = s.captions;
+  $("#assistToggle").checked = s.assist;
+  resetConfirmOff();
+}
+function openMenu() {
+  if (!started || menuOpen) return;
+  abortRound();
+  pointers.clear(); keyDown = false;
+  menuOpen = true;
+  renderMenu();
+  $("#menu").hidden = false;
+  $("#closeMenu").focus();
+}
+function closeMenu() {
+  if (!menuOpen) return;
+  hush();
+  menuOpen = false;
+  $("#menu").hidden = true;
+  if (tut.active) tut.start(); else toIdle();
+}
+$("#menuBtn").addEventListener("click", openMenu);
+$("#closeMenu").addEventListener("click", closeMenu);
+$("#menu").addEventListener("click", (e) => { if (e.target.id === "menu") closeMenu(); });
+
+[["bgmVolume", "bgmVolume"], ["sfxVolume", "sfxVolume"], ["voiceVolume", "voiceVolume"]].forEach(([id, key]) => {
+  $("#" + id).addEventListener("input", (e) => { data.settings[key] = parseFloat(e.target.value); applyVolumes(); saveData(); });
+});
+[["failHint", "failHint"], ["haptics", "haptics"], ["doubleTapCast", "doubleTapCast"], ["captions", "captions"], ["assistToggle", "assist"]].forEach(([id, key]) => {
+  $("#" + id).addEventListener("change", (e) => { data.settings[key] = e.target.checked; saveData(); });
+});
+$("#voiceVolume").addEventListener("change", () => say("음성 안내 크기입니다."));
+
+function recordsText() {
+  const st = data.stats;
+  if (!st.totalCatches) return "아직 잡은 물고기가 없습니다.";
+  const found = FISH.filter((f) => data.fish[f.id] && data.fish[f.id].count > 0);
+  let best = null;
+  found.forEach((f) => { const m = data.fish[f.id].maxSize; if (!best || m > best.size) best = { name: f.name, size: m }; });
+  return `지금까지 ${st.totalCatches}마리를 잡았습니다. 다섯 종 중 ${KOR_COUNT[found.length]} 종을 발견했습니다. 최대 기록은 ${best.name} ${best.size}센티미터입니다.`;
+}
+$("#speakRecords").addEventListener("click", () => say(recordsText()));
+$("#replayTut").addEventListener("click", () => {
+  menuOpen = false;
+  $("#menu").hidden = true;
+  tut.start();
+});
+
+function resetConfirmOff() {
+  const zone = $("#resetZone");
+  zone.innerHTML = '<button id="resetData" class="ghost" type="button">기록 초기화</button>';
+  $("#resetData").addEventListener("click", resetConfirmOn);
+}
+function resetConfirmOn() {
+  const zone = $("#resetZone");
+  zone.innerHTML = '<span>모든 포획 기록이 지워집니다.</span><button id="resetYes" class="ghost red" type="button">지우기</button><button id="resetNo" class="ghost" type="button">취소</button>';
+  $("#resetYes").addEventListener("click", () => {
+    const keep = data.settings;
+    data = DEFAULT_DATA();
+    data.settings = keep;
+    data.tutorialDone = true;
+    saveData();
+    renderMenu();
+  });
+  $("#resetNo").addEventListener("click", resetConfirmOff);
+}
+$("#resetData").addEventListener("click", resetConfirmOn);
+
+/* ---------- 시작 화면의 찌와 물결 ---------- */
+const rc = $("#ripple");
+const rctx = rc.getContext("2d");
+let rippleRAF = 0;
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drawRipple(t) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = rc.clientWidth, h = rc.clientHeight;
+  if (rc.width !== Math.round(w * dpr) || rc.height !== Math.round(h * dpr)) { rc.width = Math.round(w * dpr); rc.height = Math.round(h * dpr); }
+  rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  rctx.clearRect(0, 0, w, h);
+  const cx = w * (w < 640 ? 0.68 : 0.7), cy = h * (h < 700 ? 0.24 : 0.36);
+  const maxR = Math.max(w, h) * 0.55;
+  const period = 5200, rings = 5;
+  for (let i = 0; i < rings; i++) {
+    const p = reduceMotion ? (i + 0.5) / rings : ((t / period) + i / rings) % 1;
+    const r = 14 + p * maxR;
+    rctx.beginPath();
+    rctx.ellipse(cx, cy, r, r * 0.32, 0, 0, Math.PI * 2);
+    rctx.strokeStyle = `rgba(205, 215, 212, ${0.22 * (1 - p)})`;
+    rctx.lineWidth = 1;
+    rctx.stroke();
+  }
+  const bob = reduceMotion ? 0 : Math.sin(t / 900) * 1.5;
+  rctx.fillStyle = "#ff5a36";
+  rctx.beginPath(); rctx.ellipse(cx, cy - 10 + bob, 3.2, 9, 0, 0, Math.PI * 2); rctx.fill();
+  rctx.fillStyle = "rgba(205, 215, 212, .9)";
+  rctx.beginPath(); rctx.ellipse(cx, cy + 1 + bob, 3.2, 3, 0, 0, Math.PI * 2); rctx.fill();
+  if (!reduceMotion) rippleRAF = requestAnimationFrame(drawRipple);
+}
+function stopRipple() { cancelAnimationFrame(rippleRAF); }
+drawRipple(0);
+if (reduceMotion) window.addEventListener("resize", () => drawRipple(0));
+
+requestAnimationFrame(frame);
+
+// 테스트·디버깅용 읽기 전용 핸들
+window.__ecf = {
+  get state() { return state; },
+  get round() { return round; },
+  get data() { return data; },
+  get lastCatch() { return lastCatch; },
+  FISH,
+};
+})();
+</script>
+</body>
+</html>
