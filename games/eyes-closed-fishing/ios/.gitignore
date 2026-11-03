@@ -1,0 +1,7 @@
+*.xcodeproj
+xcuserdata/
+DerivedData/
+.build/
+.swiftpm/
+*.ipa
+*.dSYM.zip

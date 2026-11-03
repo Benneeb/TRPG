@@ -1,0 +1,67 @@
+# XcodeGen 설정. Mac에서 `xcodegen generate` 실행 → EyesClosedFishing.xcodeproj 생성
+name: EyesClosedFishing
+options:
+  bundleIdPrefix: com.example            # TODO: 본인 역도메인으로 변경
+  deploymentTarget:
+    iOS: "16.0"
+  developmentLanguage: ko
+  createIntermediateGroups: true
+
+packages:
+  FishingCore:
+    path: FishingCore
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""                 # TODO: Apple Developer 팀 ID
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1"          # iPhone 전용 (iPad 스크린샷 부담 없음)
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+
+targets:
+  EyesClosedFishing:
+    type: application
+    platform: iOS
+    sources:
+      - path: EyesClosedFishing
+    dependencies:
+      - package: FishingCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.eyesclosedfishing   # TODO
+        PRODUCT_NAME: EyesClosedFishing
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_CFBundleDisplayName: "눈 감고 낚시"
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.casual-games
+    info:
+      path: EyesClosedFishing/Info.plist
+      properties:
+        CFBundleDisplayName: "눈 감고 낚시"
+        CFBundleDevelopmentRegion: ko
+        CFBundleLocalizations: [ko]
+        LSApplicationCategoryType: public.app-category.casual-games
+        ITSAppUsesNonExemptEncryption: false
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: true
+        CADisableMinimumFrameDurationOnPhone: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIAppFonts: [GowunBatang-Bold.ttf]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+
+schemes:
+  EyesClosedFishing:
+    build:
+      targets:
+        EyesClosedFishing: all
+    test:
+      targets:
+        - package: FishingCore/FishingCoreTests
